@@ -514,6 +514,8 @@ static int find_device_object(seL4_Word paddr, seL4_Word type, int size_bits, se
             obj->frame_extra.paddr == paddr &&
             CDL_Obj_SizeBits(obj) == size_bits) {
             /* Attempt to copy the cap */
+            printf("CAPDL_TRACE: Copy device-frame cap (prev obj=%d) -> slot %d\n",
+                   (int)prev, free_slot);
             error = seL4_CNode_Copy(seL4_CapInitThreadCNode, free_slot, CONFIG_WORD_SIZE,
                                     seL4_CapInitThreadCNode, orig_caps(prev), CONFIG_WORD_SIZE, seL4_AllRights);
             ZF_LOGF_IFERR(error, "");
@@ -936,6 +938,8 @@ static void mint_cap(CDL_ObjID object_id, int free_slot, seL4_Word badge, seL4_C
     int src_index = orig_caps(object_id);
     int src_depth = CONFIG_WORD_SIZE;
 
+    printf("CAPDL_TRACE: mint_cap obj=%d -> slot %d (badge=%lu)\n",
+           (int)object_id, dest_index, (unsigned long)badge);
     int error = seL4_CNode_Mint(dest_root, dest_index, dest_depth,
                                 src_root, src_index, src_depth, rights,
                                 badge);
@@ -955,6 +959,8 @@ static void duplicate_cap(CDL_ObjID object_id, int free_slot)
     int src_index = orig_caps(object_id);
     int src_depth = CONFIG_WORD_SIZE;
 
+    printf("CAPDL_TRACE: duplicate_cap obj=%d -> slot %d\n",
+           (int)object_id, dest_index);
     int error = seL4_CNode_Copy(dest_root, dest_index, dest_depth,
                                 src_root, src_index, src_depth, rights);
     ZF_LOGF_IFERR(error, "");
@@ -1477,6 +1483,8 @@ static void map_page(CDL_Model *spec UNUSED, CDL_Cap *page_cap, CDL_ObjID pd_id,
         /* hack to support shared frames: create a new cap for each mapping */
         int dest_index = get_free_slot();
 
+        printf("CAPDL_TRACE: Shared-frame copy (src=%d) -> slot %d\n",
+               sel4_page, dest_index);
         int error_0 = seL4_CNode_Copy(seL4_CapInitThreadCNode, dest_index, CONFIG_WORD_SIZE,
                                       seL4_CapInitThreadCNode, sel4_page, CONFIG_WORD_SIZE, seL4_AllRights);
         ZF_LOGF_IFERR(error_0, "");
@@ -1836,12 +1844,14 @@ static void init_cnode_slot(CDL_Model *spec, init_cnode_mode mode, CDL_ObjID cno
 
     if (mode == MOVE && move_cap) {
         if (is_ep_cap || is_irq_handler_cap) {
-            ZF_LOGD("moving...");
+            printf("CAPDL_TRACE: install_cap MOVE (ep/irq) src_idx=%lu -> dest_root=%lu dest_idx=%lu\n",
+                   (unsigned long)src_index, (unsigned long)dest_root, (unsigned long)dest_index);
             int error = seL4_CNode_Move(dest_root, dest_index, dest_depth,
                                         src_root, src_index, src_depth);
             ZF_LOGF_IFERR(error, "");
         } else {
-            ZF_LOGD("mutating (with badge/guard %p)...", (void *)target_cap_data);
+            printf("CAPDL_TRACE: install_cap MUTATE src_idx=%lu -> dest_root=%lu dest_idx=%lu data=%p\n",
+                   (unsigned long)src_index, (unsigned long)dest_root, (unsigned long)dest_index, (void *)target_cap_data);
             int error = seL4_CNode_Mutate(dest_root, dest_index, dest_depth,
                                           src_root, src_index, src_depth, target_cap_data);
             ZF_LOGF_IFERR(error, "");
@@ -1867,11 +1877,14 @@ static void init_cnode_slot(CDL_Model *spec, init_cnode_mode mode, CDL_ObjID cno
             seL4_CPtr mapped_frame_cap = frame_cap->mapped_frame_cap;
 
             /* Move the cap to the frame used for the mapping into the destination slot. */
+            printf("CAPDL_TRACE: install_cap MOVE (mapped frame) src=%lu -> dest_root=%lu dest_idx=%lu\n",
+                   (unsigned long)mapped_frame_cap, (unsigned long)dest_root, (unsigned long)dest_index);
             int error = seL4_CNode_Move(dest_root, dest_index, dest_depth,
                                         src_root, mapped_frame_cap, src_depth);
             ZF_LOGF_IFERR(error, "");
         } else {
-            ZF_LOGD("minting (with badge/guard %p)...", (void *)target_cap_data);
+            printf("CAPDL_TRACE: install_cap MINT src_idx=%lu -> dest_root=%lu dest_idx=%lu data=%p\n",
+                   (unsigned long)src_index, (unsigned long)dest_root, (unsigned long)dest_index, (void *)target_cap_data);
             int error = seL4_CNode_Mint(dest_root, dest_index, dest_depth,
                                         src_root, src_index, src_depth, target_cap_rights, target_cap_data);
             ZF_LOGF_IFERR(error, "");
